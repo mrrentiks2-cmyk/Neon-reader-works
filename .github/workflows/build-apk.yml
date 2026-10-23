@@ -1,0 +1,40 @@
+name: Build APK
+
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Unpack project archive (if the repo contains only a zip)
+        run: |
+          if [ ! -f settings.gradle ]; then
+            Z=$(ls *.zip 2>/dev/null | head -n1)
+            if [ -z "$Z" ]; then echo "В корне репозитория нет ни проекта, ни zip-архива"; exit 1; fi
+            unzip -o -q "$Z" -d _unz
+            S=$(find _unz -maxdepth 3 -name settings.gradle | head -n1)
+            if [ -z "$S" ]; then echo "В архиве не найден settings.gradle"; exit 1; fi
+            cp -a "$(dirname "$S")"/. .
+          fi
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Build APK
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --stacktrace
+
+      - name: Collect APK
+        run: cp app/build/outputs/apk/release/app-release.apk NeonReader.apk
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: NeonReader-apk
+          path: NeonReader.apk
